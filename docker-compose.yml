@@ -1,0 +1,49 @@
+version: '3.6'
+
+networks:
+  cloudflared_pub:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
+
+secrets:
+  pihole_web_password:
+    file: ./docker/secrets/pihole_web_password
+
+services:
+  cloudflared:
+    container_name: cloudflared
+    image: visibilityspots/cloudflared:latest
+    networks:
+      cloudflared_pub:
+        ipv4_address: 10.0.0.10      
+    expose:
+      - 5054
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro       
+
+  pihole:
+    container_name: pihole
+    depends_on:
+      - cloudflared     
+    environment:
+      - PIHOLE_DNS_=10.0.0.10#5054
+      - DNSMASQ_LISTENING=all
+      - WEBPASSWORD_FILE=/run/secrets/pihole_web_password
+    image: pihole/pihole:latest
+    networks:
+      cloudflared_pub:
+        ipv4_address: 10.0.0.11            
+    ports:
+      - 80:80/tcp
+      - 53:53/tcp
+      - 53:53/udp
+    restart: unless-stopped
+    secrets:
+      - pihole_web_password
+    volumes:
+      - /etc/localtime:/etc/localtime:ro    
+      - ./pihole/pihole/:/etc/pihole/
+      - ./pihole/dnsmasq.d/:/etc/dnsmasq.d/
